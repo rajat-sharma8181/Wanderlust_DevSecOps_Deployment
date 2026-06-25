@@ -1,0 +1,177 @@
+name: Wanderlust CI Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      FRONTEND_DOCKER_TAG:
+        description: 'Docker image tag for the frontend image'
+        required: true
+        type: string
+      BACKEND_DOCKER_TAG:
+        description: 'Docker image tag for the backend image'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate Parameters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required inputs
+        run: |
+          if [ -z "${{ github.event.inputs.FRONTEND_DOCKER_TAG }}" ] || [ -z "${{ github.event.inputs.BACKEND_DOCKER_TAG }}" ]; then
+            echo "ERROR: FRONTEND_DOCKER_TAG and BACKEND_DOCKER_TAG must be provided."
+            exit 1
+          fi
+          echo "FRONTEND_DOCKER_TAG: ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
+          echo "BACKEND_DOCKER_TAG:  ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+
+  gitleaks:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Required only for GitHub Org private repos
+
+  security-scan:
+    name: Security Scans (Trivy FS + OWASP)
+    needs: [validate, gitleaks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'wanderlust'
+          path: '.'
+          format: 'XML'
+          out: '.'
+          args: --enableRetired
+
+      - name: Upload OWASP XML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: '*.xml'
+          retention-days: 7
+
+  sonarqube:
+    name: SonarQube Analysis & Quality Gate
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=wanderlust
+            -Dsonar.projectName=wanderlust
+
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  build-scan-push:
+    name: Docker Build, Trivy Image Scan & Push to ECR
+    needs: sonarqube
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Backend Environment Setup
+        working-directory: Automations
+        run: bash updatebackendnew.sh
+
+      - name: Frontend Environment Setup
+        working-directory: Automations
+        run: bash updatefrontendnew.sh
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Backend Docker Image
+        working-directory: backend
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }} .
+
+      - name: Build Frontend Docker Image
+        working-directory: frontend
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }} .
+
+      - name: Trivy Image Scan - Backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: '${{ steps.login-ecr.outputs.registry }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }}'
+          format: 'table'
+          exit-code: '0'
+
+      - name: Trivy Image Scan - Frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: '${{ steps.login-ecr.outputs.registry }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }}'
+          format: 'table'
+          exit-code: '0'
+
+      - name: Push Backend Image to ECR
+        run: docker push ${{ steps.login-ecr.outputs.registry }}/wanderlust-backend-beta:${{ github.event.inputs.BACKEND_DOCKER_TAG }}
+
+      - name: Push Frontend Image to ECR
+        run: docker push ${{ steps.login-ecr.outputs.registry }}/wanderlust-frontend-beta:${{ github.event.inputs.FRONTEND_DOCKER_TAG }}
+
+  trigger-cd:
+    name: Trigger CD Pipeline
+    needs: build-scan-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Wanderlust CD Workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GH_PAT }}
+          event-type: trigger-cd
+          client-payload: >
+            {
+              "FRONTEND_DOCKER_TAG": "${{ github.event.inputs.FRONTEND_DOCKER_TAG }}",
+              "BACKEND_DOCKER_TAG": "${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+            }

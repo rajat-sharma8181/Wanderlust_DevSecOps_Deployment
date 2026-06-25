@@ -1,0 +1,54 @@
+name: Wanderlust CD Pipeline
+
+on:
+  repository_dispatch:
+    types: [trigger-cd]
+  workflow_dispatch:
+    inputs:
+      FRONTEND_DOCKER_TAG:
+        description: 'Frontend Docker image tag (built by CI)'
+        required: true
+        type: string
+      BACKEND_DOCKER_TAG:
+        description: 'Backend Docker image tag (built by CI)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Update Kubernetes Manifests & Push
+    runs-on: ubuntu-latest
+    env:
+      FRONTEND_DOCKER_TAG: ${{ github.event.client_payload.FRONTEND_DOCKER_TAG || github.event.inputs.FRONTEND_DOCKER_TAG }}
+      BACKEND_DOCKER_TAG: ${{ github.event.client_payload.BACKEND_DOCKER_TAG || github.event.inputs.BACKEND_DOCKER_TAG }}
+
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Verify Docker Image Tags
+        run: |
+          echo "FRONTEND_DOCKER_TAG: ${{ env.FRONTEND_DOCKER_TAG }}"
+          echo "BACKEND_DOCKER_TAG:  ${{ env.BACKEND_DOCKER_TAG }}"
+
+      - name: Update Backend Kubernetes Manifest
+        working-directory: kubernetes
+        run: |
+          sed -i "s|wanderlust-backend-beta.*|wanderlust-backend-beta:${{ env.BACKEND_DOCKER_TAG }}|g" backend.yaml
+
+      - name: Update Frontend Kubernetes Manifest
+        working-directory: kubernetes
+        run: |
+          sed -i "s|wanderlust-frontend-beta.*|wanderlust-frontend-beta:${{ env.FRONTEND_DOCKER_TAG }}|g" frontend.yaml
+
+      - name: Commit and Push Updated Manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status
+          git add kubernetes/backend.yaml kubernetes/frontend.yaml
+          git diff --cached --quiet || git commit -m "Updated Kubernetes manifests to backend:${{ env.BACKEND_DOCKER_TAG }} frontend:${{ env.FRONTEND_DOCKER_TAG }}"
+          git push
+
