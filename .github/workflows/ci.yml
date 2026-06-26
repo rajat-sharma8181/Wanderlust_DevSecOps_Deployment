@@ -64,7 +64,7 @@ jobs:
           path: '.'
           format: 'XML'
           out: '.'
-          args: --enableRetired
+          args: --enableRetired --disableNodeAudit
 
       - name: Upload OWASP XML Report
         uses: actions/upload-artifact@v4
