@@ -94,6 +94,9 @@ jobs:
             -Dsonar.projectKey=wanderlust
             -Dsonar.projectName=wanderlust
 
+      - name: Debug report-task.txt
+        run: cat .scannerwork/report-task.txt
+
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@master
         timeout-minutes: 5
