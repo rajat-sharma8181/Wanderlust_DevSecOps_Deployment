@@ -94,8 +94,12 @@ jobs:
             -Dsonar.projectKey=wanderlust
             -Dsonar.projectName=wanderlust
 
-      - name: Debug report-task.txt
-        run: cat .scannerwork/report-task.txt
+      - name: Debug SonarQube Connection
+        run: |
+          echo "Testing SonarQube connectivity..."
+          curl -v "${{ secrets.SONAR_HOST_URL }}/api/ce/activity"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@master
