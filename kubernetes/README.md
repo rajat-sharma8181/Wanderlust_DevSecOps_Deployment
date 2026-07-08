@@ -1,3 +1,9 @@
+> [!NOTE]
+> **Superseded for EKS.** These raw NodePort manifests target a single-node kubeadm
+> setup and are kept for reference only. The EKS deployment is now delivered as a Helm
+> chart (`helm/wanderlust/`) via ArgoCD (`argocd/application.yaml`) using GitOps.
+> See the repo README / plan for the ALB Ingress + gp3 StatefulSet setup.
+
 # Wanderlust Deployment on Kubernetes
 
 ### In this project, we will learn about how to deploy wanderlust application on Kubernetes.

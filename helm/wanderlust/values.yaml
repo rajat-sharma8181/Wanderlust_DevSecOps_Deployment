@@ -1,0 +1,99 @@
+global:
+  namespace: wanderlust
+  # Placeholder ECR registry. Replace <account-id> and <region> with your values,
+  # e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+  imageRegistry: "231733667519.dkr.ecr.ap-southeast-1.amazonaws.com"
+  # EBS-backed StorageClass (requires the EBS CSI driver add-on on EKS).
+  storageClass: gp3
+
+backend:
+  image:
+    repository: wanderlust-backend-beta
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 8080
+  # These override the values baked into the image's .env.docker (dotenv does not
+  # override existing process.env), pointing the app at the correct in-cluster services.
+  env:
+    PORT: "8080"
+    MONGODB_URI: "mongodb://mongo-service:27017/wanderlust"
+    REDIS_URL: "redis://redis-service:6379"
+    ACCESS_TOKEN_EXPIRES_IN: "1d"
+    REFRESH_TOKEN_EXPIRES_IN: "7d"
+    ACCESS_COOKIE_MAXAGE: "86400000"
+    REFRESH_COOKIE_MAXAGE: "604800000"
+    REDIRECTION_URL: "/"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontend:
+  image:
+    repository: wanderlust-frontend-beta
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 5173
+  env:
+    # Empty => frontend calls the API same-origin (/api/...), routed by the ALB Ingress
+    # to the backend. Avoids baking the ALB hostname into the frontend build.
+    VITE_API_PATH: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+mongodb:
+  image: mongo:7
+  port: 27017
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+redis:
+  image: redis:7
+  port: 6379
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+ingress:
+  enabled: true
+  className: alb
+  # Optional custom domain. Empty => reach the app via the ALB's generated DNS name.
+  host: ""
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+
+# Secret values. For production, replace with AWS Secrets Manager + External Secrets Operator.
+secrets:
+  JWT_SECRET: "my-super-secret-key"
+  GAUTH_CLIENT_ID: "dummy"
+  GAUTH_CLIENT_SECRET: "dummy"
+  GAUTH_TOKEN_URL: "https://oauth2.googleapis.com/token"
+  GAUTH_USER_URL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  GITHUB_CLIENT_ID: "dummy"
+  GITHUB_CLIENT_SECRET: "dummy"
+  GITHUB_TOKEN_URL: "https://github.com/login/oauth/access_token"
+  GITHUB_USER_URL: "https://api.github.com/user"

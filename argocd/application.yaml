@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wanderlust
+  namespace: argocd
+  # Keep the app from being pruned before its child resources are cleaned up.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rajat-sharma8181/Wanderlust_DevSecOps_Deployment.git
+    targetRevision: main
+    path: helm/wanderlust
+    helm:
+      valueFiles:
+        - values.yaml
+  # ArgoCD runs inside the eks-poc-demo-dev cluster, so it deploys to the in-cluster API.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wanderlust
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

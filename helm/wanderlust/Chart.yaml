@@ -1,0 +1,6 @@
+apiVersion: v2
+name: wanderlust
+description: Wanderlust MERN blogging app (frontend, backend, MongoDB, Redis) for EKS via Helm + ArgoCD
+type: application
+version: 0.1.0
+appVersion: "2.0"
