@@ -111,6 +111,9 @@ jobs:
       #     curl -v "${{ secrets.SONAR_HOST_URL }}/api/ce/activity"
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Test Sonar Connection
+        run: |
+          curl -v ${{ secrets.SONAR_HOST_URL }}/api/system/status
 
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
