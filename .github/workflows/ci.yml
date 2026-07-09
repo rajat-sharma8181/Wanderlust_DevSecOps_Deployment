@@ -37,9 +37,10 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source . --no-git --redact
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Required only for GitHub Org private repos
 
   security-scan:
     name: Security Scans (Trivy FS + OWASP)
