@@ -89,14 +89,13 @@ jobs:
     name: SonarQube Analysis & Quality Gate
     needs: security-scan
     runs-on: ubuntu-latest
-  
     steps:
-      - name: Checkout
+      - name: Git Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-  
-      - name: SonarQube Scan & Quality Gate
+
+      - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -105,8 +104,20 @@ jobs:
           args: >
             -Dsonar.projectKey=wanderlust
             -Dsonar.projectName=wanderlust
-            -Dsonar.qualitygate.wait=true
-            -Dsonar.qualitygate.timeout=300
+
+      # - name: Debug SonarQube Connection
+      #   run: |
+      #     echo "Testing SonarQube connectivity..."
+      #     curl -v "${{ secrets.SONAR_HOST_URL }}/api/ce/activity"
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v5
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   build-scan-push:
     name: Docker Build, Trivy Image Scan & Push to ECR
