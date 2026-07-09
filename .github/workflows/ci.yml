@@ -105,32 +105,6 @@ jobs:
             -Dsonar.projectKey=wanderlust
             -Dsonar.projectName=wanderlust
 
-      # - name: Debug SonarQube Connection
-      #   run: |
-      #     echo "Testing SonarQube connectivity..."
-      #     curl -v "${{ secrets.SONAR_HOST_URL }}/api/ce/activity"
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      # - name: Test Sonar Connection
-      #   run: |
-      #     curl -v ${{ secrets.SONAR_HOST_URL }}/api/system/status
-
-      # - name: Test Sonar CE Task API
-      #   run: |
-      #     echo "Checking report-task.txt"
-      #     cat .scannerwork/report-task.txt
-      
-      #     CE_TASK_ID=$(grep ceTaskId .scannerwork/report-task.txt | cut -d= -f2)
-      
-      #     echo "CE_TASK_ID=$CE_TASK_ID"
-      
-      #     curl -v \
-      #       -u "${SONAR_TOKEN}:" \
-      #       "${SONAR_HOST_URL}/api/ce/task?id=${CE_TASK_ID}"
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
       # - name: SonarQube Quality Gate
       #   uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
       #   timeout-minutes: 5
