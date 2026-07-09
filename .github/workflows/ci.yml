@@ -78,12 +78,13 @@ jobs:
     name: SonarQube Analysis & Quality Gate
     needs: security-scan
     runs-on: ubuntu-latest
+  
     steps:
-      - name: Git Checkout
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+  
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
@@ -93,14 +94,40 @@ jobs:
           args: >
             -Dsonar.projectKey=wanderlust
             -Dsonar.projectName=wanderlust
-
-      - name: Debug SonarQube Connection
+            -Dsonar.verbose=true
+  
+      - name: Display report-task.txt
         run: |
-          echo "Testing SonarQube connectivity..."
-          curl -v "${{ secrets.SONAR_HOST_URL }}/api/ce/activity"
+          echo "================ report-task.txt ================"
+          cat .scannerwork/report-task.txt
+  
+      - name: Verify SonarQube Server
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          echo "================ Server Version ================"
+          curl -u "${SONAR_TOKEN}:" \
+            "${SONAR_HOST_URL}/api/server/version"
+  
+          echo ""
+          echo "================ Server Status ================"
+          curl -u "${SONAR_TOKEN}:" \
+            "${SONAR_HOST_URL}/api/system/status"
+  
+      - name: Verify Compute Engine Task
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
+  
+          echo "CE Task URL:"
+          echo "$TASK_URL"
+  
+          echo ""
+          echo "Response:"
+          curl -v -u "${SONAR_TOKEN}:" "$TASK_URL"
+  
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v5
         timeout-minutes: 5
