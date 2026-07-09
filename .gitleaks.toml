@@ -1,0 +1,22 @@
+title = "Wanderlust gitleaks config"
+
+# Keep all built-in gitleaks rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "SonarQube quality-gate curl calls used GitHub Actions secret references (SONAR_TOKEN), not real credentials."
+
+# Belt-and-suspenders: skip the specific historical commit that introduced the
+# false positives (the pre-refactor ci.yml with manual `curl -u <token>:` calls).
+commits = [
+  "ac01e6ed3439acbbb85b56f9ab0384fb9b904106",
+]
+
+# Also allowlist the pattern itself so it stays green even if the commit SHA
+# changes (e.g. after any future history rewrite). Match against the whole line
+# so the `curl -u ... SONAR_TOKEN` construct is recognized regardless of quoting.
+regexTarget = "line"
+regexes = [
+  '''curl\s+(-v\s+)?-u\s+.*SONAR_TOKEN''',
+]
