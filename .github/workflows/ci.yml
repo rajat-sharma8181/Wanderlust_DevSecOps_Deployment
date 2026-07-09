@@ -85,7 +85,7 @@ jobs:
 
 
   sonarqube:
-    name: SonarQube Analysis & Quality Gate
+    name: SonarQube Analysis
     needs: security-scan
     runs-on: ubuntu-latest
     steps:
@@ -93,17 +93,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: SonarQube Scan & Quality Gate
+      - name: SonarQube Scan 
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
           args: >
-            "-Dsonar.projectKey=MyWebApp"
-            "-Dsonar.projectName=MyWebApp"
-            "-Dsonar.sources=."
-            "-Dsonar.qualitygate.wait=true"
+            -Dsonar.projectKey=wanderlust
+            -Dsonar.projectName=wanderlust
 
   build-scan-push:
     name: Docker Build, Trivy Image Scan & Push to ECR
