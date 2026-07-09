@@ -93,17 +93,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+      - name: SonarQube Scan & Quality Gate
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      - name: Quality Gate Check
-        uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            "-Dsonar.projectKey=MyWebApp"
+            "-Dsonar.projectName=MyWebApp"
+            "-Dsonar.sources=."
+            "-Dsonar.qualitygate.wait=true"
 
   build-scan-push:
     name: Docker Build, Trivy Image Scan & Push to ECR
