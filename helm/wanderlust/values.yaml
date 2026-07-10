@@ -4,7 +4,7 @@ global:
   # e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com
   imageRegistry: "231733667519.dkr.ecr.ap-southeast-1.amazonaws.com"
   # EBS-backed StorageClass (requires the EBS CSI driver add-on on EKS).
-  storageClass: gp3
+  storageClass: gp2
 
 backend:
   image:
