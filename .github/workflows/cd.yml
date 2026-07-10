@@ -120,6 +120,12 @@
 name: Wanderlust CD Pipeline
 
 on:
+  # Downstream trigger: CI's `trigger-cd` job dispatches this event with the image
+  # tags in client_payload after a successful build => green CI auto-runs this deploy.
+  repository_dispatch:
+    types:
+      - trigger-cd
+
   workflow_dispatch:
     inputs:
       FRONTEND_DOCKER_TAG:
@@ -131,10 +137,18 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: wanderlust-cd
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to EKS via Helm
     runs-on: ubuntu-latest
+    # Resolve tags from either source: repository_dispatch (CI) or manual workflow_dispatch.
+    env:
+      FRONTEND_DOCKER_TAG: ${{ github.event.client_payload.FRONTEND_DOCKER_TAG || github.event.inputs.FRONTEND_DOCKER_TAG }}
+      BACKEND_DOCKER_TAG: ${{ github.event.client_payload.BACKEND_DOCKER_TAG || github.event.inputs.BACKEND_DOCKER_TAG }}
     steps:
       - name: Git Checkout
         uses: actions/checkout@v4
@@ -159,18 +173,20 @@ jobs:
         with:
           version: 'v3.15.0'
 
-      - name: Show inputs
+      - name: Verify inputs
         run: |
-          echo "Frontend tag: ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
-          echo "Backend tag:  ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+          echo "Frontend tag: ${FRONTEND_DOCKER_TAG}"
+          echo "Backend tag:  ${BACKEND_DOCKER_TAG}"
+          test -n "${FRONTEND_DOCKER_TAG}" || { echo "Frontend tag missing"; exit 1; }
+          test -n "${BACKEND_DOCKER_TAG}" || { echo "Backend tag missing"; exit 1; }
 
       - name: Helm Upgrade
         run: |
           helm upgrade --install wanderlust helm/wanderlust \
             --namespace wanderlust \
             --create-namespace \
-            --set frontend.image.tag=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} \
-            --set backend.image.tag=${{ github.event.inputs.BACKEND_DOCKER_TAG }} \
+            --set frontend.image.tag="${FRONTEND_DOCKER_TAG}" \
+            --set backend.image.tag="${BACKEND_DOCKER_TAG}" \
             --wait --timeout 10m
 
       - name: Verify Rollout - Backend
