@@ -4,3 +4,4 @@ description: Wanderlust MERN blogging app (frontend, backend, MongoDB, Redis) fo
 type: application
 version: 0.1.0
 appVersion: "2.0"
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png
