@@ -1,117 +1,183 @@
-name: Wanderlust CD Pipeline (GitOps)
+# name: Wanderlust CD Pipeline (GitOps)
  
-# GitOps CD:
-# This workflow NEVER talks to Kubernetes.
-# It updates the Helm values file with new image tags and commits the change.
-# ArgoCD detects the Git commit and automatically syncs the application to EKS.
+# # GitOps CD:
+# # This workflow NEVER talks to Kubernetes.
+# # It updates the Helm values file with new image tags and commits the change.
+# # ArgoCD detects the Git commit and automatically syncs the application to EKS.
  
+# on:
+#   repository_dispatch:
+#     types:
+#       - trigger-cd
+ 
+#   workflow_dispatch:
+#     inputs:
+#       FRONTEND_DOCKER_TAG:
+#         description: Frontend Docker image tag
+#         required: true
+#         type: string
+ 
+#       BACKEND_DOCKER_TAG:
+#         description: Backend Docker image tag
+#         required: true
+#         type: string
+ 
+# concurrency:
+#   group: wanderlust-gitops-cd
+#   cancel-in-progress: true
+ 
+# jobs:
+#   update-manifests:
+#     name: Update Helm Values
+#     runs-on: ubuntu-latest
+ 
+#     permissions:
+#       contents: write
+ 
+#     env:
+#       VALUES_FILE: helm/wanderlust/values.yaml
+ 
+#       FRONTEND_DOCKER_TAG: ${{ github.event.client_payload.FRONTEND_DOCKER_TAG || github.event.inputs.FRONTEND_DOCKER_TAG }}
+ 
+#       BACKEND_DOCKER_TAG: ${{ github.event.client_payload.BACKEND_DOCKER_TAG || github.event.inputs.BACKEND_DOCKER_TAG }}
+ 
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+#         with:
+#           token: ${{ secrets.GH_PAT }}
+#           fetch-depth: 0
+ 
+#       - name: Install yq
+#         uses: mikefarah/yq@v4.44.2
+ 
+#       - name: Setup Helm
+#         uses: azure/setup-helm@v4
+ 
+#       - name: Verify Inputs
+#         run: |
+#           echo "Frontend Tag : ${FRONTEND_DOCKER_TAG}"
+#           echo "Backend Tag  : ${BACKEND_DOCKER_TAG}"
+ 
+#           test -n "${FRONTEND_DOCKER_TAG}" || { echo "Frontend tag missing"; exit 1; }
+#           test -n "${BACKEND_DOCKER_TAG}" || { echo "Backend tag missing"; exit 1; }
+ 
+#       - name: Verify Helm Values File
+#         run: |
+#           if [ ! -f "${VALUES_FILE}" ]; then
+#             echo "Values file not found: ${VALUES_FILE}"
+#             exit 1
+#           fi
+ 
+#       - name: Update Image Tags
+#         run: |
+#           yq -i '.backend.image.tag = strenv(BACKEND_DOCKER_TAG)' "${VALUES_FILE}"
+#           yq -i '.frontend.image.tag = strenv(FRONTEND_DOCKER_TAG)' "${VALUES_FILE}"
+ 
+#       - name: Show Updated Values
+#         run: |
+#           echo "Updated image tags:"
+#           yq '.backend.image' "${VALUES_FILE}"
+#           yq '.frontend.image' "${VALUES_FILE}"
+ 
+#       - name: Validate Helm Chart
+#         run: |
+#           helm lint helm/wanderlust
+ 
+#       - name: Commit Changes
+#         run: |
+#           git config user.name "github-actions[bot]"
+#           git config user.email "github-actions[bot]@users.noreply.github.com"
+ 
+#           git add "${VALUES_FILE}"
+ 
+#           if git diff --cached --quiet; then
+#             echo "No changes detected."
+#             exit 0
+#           fi
+ 
+#           git commit -m "chore(gitops): deploy backend=${BACKEND_DOCKER_TAG} frontend=${FRONTEND_DOCKER_TAG}"
+ 
+#       - name: Push Changes
+#         run: |
+#           git pull --rebase origin "${GITHUB_REF_NAME}"
+ 
+#           git push origin HEAD:"${GITHUB_REF_NAME}"
+ 
+#       - name: Deployment Triggered
+#         run: |
+#           echo "========================================"
+#           echo "GitOps deployment completed."
+#           echo ""
+#           echo "Backend Image : ${BACKEND_DOCKER_TAG}"
+#           echo "Frontend Image: ${FRONTEND_DOCKER_TAG}"
+#           echo ""
+#           echo "ArgoCD will automatically detect this"
+#           echo "commit and sync the application."
+#           echo "========================================"
+
+
+name: Wanderlust CD Pipeline
+
 on:
-  repository_dispatch:
-    types:
-      - trigger-cd
- 
   workflow_dispatch:
     inputs:
       FRONTEND_DOCKER_TAG:
-        description: Frontend Docker image tag
+        description: 'Docker image tag for the frontend image'
         required: true
         type: string
- 
       BACKEND_DOCKER_TAG:
-        description: Backend Docker image tag
+        description: 'Docker image tag for the backend image'
         required: true
         type: string
- 
-concurrency:
-  group: wanderlust-gitops-cd
-  cancel-in-progress: true
- 
+
 jobs:
-  update-manifests:
-    name: Update Helm Values
+  deploy:
+    name: Deploy to EKS via Helm
     runs-on: ubuntu-latest
- 
-    permissions:
-      contents: write
- 
-    env:
-      VALUES_FILE: helm/wanderlust/values.yaml
- 
-      FRONTEND_DOCKER_TAG: ${{ github.event.client_payload.FRONTEND_DOCKER_TAG || github.event.inputs.FRONTEND_DOCKER_TAG }}
- 
-      BACKEND_DOCKER_TAG: ${{ github.event.client_payload.BACKEND_DOCKER_TAG || github.event.inputs.BACKEND_DOCKER_TAG }}
- 
     steps:
-      - name: Checkout Repository
+      - name: Git Checkout
         uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          token: ${{ secrets.GH_PAT }}
-          fetch-depth: 0
- 
-      - name: Install yq
-        uses: mikefarah/yq@v4.44.2
- 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name eks-poc-demo-dev --region ${{ secrets.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.32.0'
+
       - name: Setup Helm
         uses: azure/setup-helm@v4
- 
-      - name: Verify Inputs
+        with:
+          version: 'v3.15.0'
+
+      - name: Show inputs
         run: |
-          echo "Frontend Tag : ${FRONTEND_DOCKER_TAG}"
-          echo "Backend Tag  : ${BACKEND_DOCKER_TAG}"
- 
-          test -n "${FRONTEND_DOCKER_TAG}" || { echo "Frontend tag missing"; exit 1; }
-          test -n "${BACKEND_DOCKER_TAG}" || { echo "Backend tag missing"; exit 1; }
- 
-      - name: Verify Helm Values File
+          echo "Frontend tag: ${{ github.event.inputs.FRONTEND_DOCKER_TAG }}"
+          echo "Backend tag:  ${{ github.event.inputs.BACKEND_DOCKER_TAG }}"
+
+      - name: Helm Upgrade
         run: |
-          if [ ! -f "${VALUES_FILE}" ]; then
-            echo "Values file not found: ${VALUES_FILE}"
-            exit 1
-          fi
- 
-      - name: Update Image Tags
-        run: |
-          yq -i '.backend.image.tag = strenv(BACKEND_DOCKER_TAG)' "${VALUES_FILE}"
-          yq -i '.frontend.image.tag = strenv(FRONTEND_DOCKER_TAG)' "${VALUES_FILE}"
- 
-      - name: Show Updated Values
-        run: |
-          echo "Updated image tags:"
-          yq '.backend.image' "${VALUES_FILE}"
-          yq '.frontend.image' "${VALUES_FILE}"
- 
-      - name: Validate Helm Chart
-        run: |
-          helm lint helm/wanderlust
- 
-      - name: Commit Changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
- 
-          git add "${VALUES_FILE}"
- 
-          if git diff --cached --quiet; then
-            echo "No changes detected."
-            exit 0
-          fi
- 
-          git commit -m "chore(gitops): deploy backend=${BACKEND_DOCKER_TAG} frontend=${FRONTEND_DOCKER_TAG}"
- 
-      - name: Push Changes
-        run: |
-          git pull --rebase origin "${GITHUB_REF_NAME}"
- 
-          git push origin HEAD:"${GITHUB_REF_NAME}"
- 
-      - name: Deployment Triggered
-        run: |
-          echo "========================================"
-          echo "GitOps deployment completed."
-          echo ""
-          echo "Backend Image : ${BACKEND_DOCKER_TAG}"
-          echo "Frontend Image: ${FRONTEND_DOCKER_TAG}"
-          echo ""
-          echo "ArgoCD will automatically detect this"
-          echo "commit and sync the application."
-          echo "========================================"
+          helm upgrade --install wanderlust helm/wanderlust \
+            --namespace wanderlust \
+            --create-namespace \
+            --set frontend.image.tag=${{ github.event.inputs.FRONTEND_DOCKER_TAG }} \
+            --set backend.image.tag=${{ github.event.inputs.BACKEND_DOCKER_TAG }} \
+            --wait --timeout 10m
+
+      - name: Verify Rollout - Backend
+        run: kubectl -n wanderlust rollout status deploy/backend-deployment --timeout=5m
+
+      - name: Verify Rollout - Frontend
+        run: kubectl -n wanderlust rollout status deploy/frontend-deployment --timeout=5m
+
+      - name: Get Ingress Address
+        run: kubectl -n wanderlust get ingress wanderlust-ingress
