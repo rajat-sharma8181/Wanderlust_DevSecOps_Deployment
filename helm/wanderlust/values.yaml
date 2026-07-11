@@ -5,7 +5,6 @@ global:
   imageRegistry: "231733667519.dkr.ecr.ap-southeast-1.amazonaws.com"
   # EBS-backed StorageClass (requires the EBS CSI driver add-on on EKS).
   storageClass: gp2
-
 backend:
   image:
     repository: wanderlust-backend-beta
@@ -31,11 +30,10 @@ backend:
     limits:
       cpu: 500m
       memory: 512Mi
-
 frontend:
   image:
     repository: wanderlust-frontend-beta
-    tag: dev-front-test15
+    tag: dev-front-testv15
     pullPolicy: IfNotPresent
   replicas: 3
   port: 5173
@@ -50,7 +48,6 @@ frontend:
     limits:
       cpu: 500m
       memory: 512Mi
-
 mongodb:
   image: mongo:7
   port: 27017
@@ -62,7 +59,6 @@ mongodb:
     limits:
       cpu: 500m
       memory: 1Gi
-
 redis:
   image: redis:7
   port: 6379
@@ -74,7 +70,6 @@ redis:
     limits:
       cpu: 250m
       memory: 256Mi
-
 ingress:
   enabled: true
   className: alb
@@ -85,7 +80,6 @@ ingress:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /
-
 # Secret values. For production, replace with AWS Secrets Manager + External Secrets Operator.
 secrets:
   JWT_SECRET: "my-super-secret-key"
