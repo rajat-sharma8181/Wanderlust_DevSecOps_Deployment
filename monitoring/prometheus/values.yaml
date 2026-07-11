@@ -1,0 +1,53 @@
+# kube-prometheus-stack values for the Wanderlust EKS cluster.
+# Access is via `kubectl port-forward`, so all services remain ClusterIP.
+
+grafana:
+  enabled: true
+  adminPassword: "Admin@12345"          # CHANGE THIS; used for the Grafana admin login
+  service:
+    type: ClusterIP
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: gp2
+    accessModes: ["ReadWriteOnce"]
+    size: 5Gi
+  defaultDashboardsEnabled: true        # bundles the standard Kubernetes dashboards
+
+prometheus:
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+# Core exporters (defaults, listed for clarity).
+nodeExporter:
+  enabled: true
+kube-state-metrics:
+  enabled: true

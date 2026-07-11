@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  # Keep the app from being pruned before its child resources are cleaned up.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # Multi-source: pull the chart from the community Helm repo, and read values.yaml
+  # from this Git repo (referenced as $values).
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      # !! REQUIRED: set to a real, current chart version before applying. Find it with:
+      #   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      #   helm repo update
+      #   helm search repo prometheus-community/kube-prometheus-stack --versions | head
+      targetRevision: 65.5.0
+      helm:
+        valueFiles:
+          - $values/monitoring/prometheus/values.yaml
+    - repoURL: https://github.com/rajat-sharma8181/Wanderlust_DevSecOps_Deployment.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Required: kube-prometheus-stack CRDs are too large for client-side apply.
+      - ServerSideApply=true
