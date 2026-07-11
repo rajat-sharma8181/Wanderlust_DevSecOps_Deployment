@@ -9,7 +9,7 @@ global:
 backend:
   image:
     repository: wanderlust-backend-beta
-    tag: dev-back-testv14
+    tag: dev-back-testv15
     pullPolicy: IfNotPresent
   replicas: 3
   port: 8080
@@ -35,7 +35,7 @@ backend:
 frontend:
   image:
     repository: wanderlust-frontend-beta
-    tag: dev-front-test14
+    tag: dev-front-test15
     pullPolicy: IfNotPresent
   replicas: 3
   port: 5173
