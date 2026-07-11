@@ -10,7 +10,7 @@ backend:
     repository: wanderlust-backend-beta
     tag: dev-back-testv17
     pullPolicy: IfNotPresent
-  replicas: 3
+  replicas: 1
   port: 8080
   # These override the values baked into the image's .env.docker (dotenv does not
   # override existing process.env), pointing the app at the correct in-cluster services.
@@ -35,7 +35,7 @@ frontend:
     repository: wanderlust-frontend-beta
     tag: dev-front-testv17
     pullPolicy: IfNotPresent
-  replicas: 3
+  replicas: 1
   port: 5173
   env:
     # Empty => frontend calls the API same-origin (/api/...), routed by the ALB Ingress
